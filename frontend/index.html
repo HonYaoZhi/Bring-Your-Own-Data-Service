@@ -1,0 +1,1249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BYOD — Bring Your Own Data</title>
+  <style>
+    :root {
+      --bg:       #0f1117;
+      --surface:  #181c27;
+      --surface2: #1f2535;
+      --border:   #2a3049;
+      --accent:   #4f8ef7;
+      --accent2:  #3ecf8e;
+      --danger:   #f75f5f;
+      --warn:     #f7b74f;
+      --text:     #e8eaf0;
+      --muted:    #7a8099;
+      --mono:     'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+      --sans:     'Inter', system-ui, sans-serif;
+      --radius:   8px;
+      --shadow:   0 4px 24px rgba(0,0,0,0.4);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Top bar ── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .logo {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: .04em;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .logo-icon {
+      width: 28px; height: 28px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px;
+    }
+
+    .logo-sub { color: var(--muted); font-weight: 400; font-size: 13px; }
+
+    header .spacer { flex: 1; }
+
+    .status-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--accent2);
+      box-shadow: 0 0 6px var(--accent2);
+    }
+
+    .status-label { font-size: 12px; color: var(--muted); }
+
+    /* ── Layout ── */
+    .app {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      height: calc(100vh - 56px);
+    }
+
+    /* ── Sidebar ── */
+    aside {
+      width: 240px;
+      min-width: 200px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .sidebar-section {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .sidebar-title {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    /* Drop zone */
+    #drop-zone {
+      border: 1.5px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 16px 12px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+      position: relative;
+    }
+
+    #drop-zone:hover, #drop-zone.drag-over {
+      border-color: var(--accent);
+      background: rgba(79,142,247,.06);
+    }
+
+    #drop-zone input[type=file] {
+      position: absolute; inset: 0;
+      opacity: 0; cursor: pointer;
+    }
+
+    .drop-icon { font-size: 22px; margin-bottom: 6px; }
+    .drop-label { font-size: 12px; color: var(--muted); line-height: 1.4; }
+    .drop-types { font-size: 10px; color: var(--muted); margin-top: 4px; opacity: .7; }
+
+    /* Dataset list */
+    .dataset-list { flex: 1; overflow-y: auto; padding: 8px 0; }
+
+    .dataset-item {
+      padding: 9px 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      border-left: 2px solid transparent;
+      transition: background .15s;
+    }
+
+    .dataset-item:hover { background: var(--surface2); }
+    .dataset-item.active {
+      background: var(--surface2);
+      border-left-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .dataset-icon { font-size: 14px; opacity: .7; }
+    .dataset-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dataset-count {
+      font-size: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1px 6px;
+      color: var(--muted);
+    }
+
+    .dataset-delete {
+      opacity: 0;
+      background: none;
+      border: none;
+      color: var(--danger);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 2px 4px;
+      border-radius: 4px;
+      transition: opacity .15s, background .15s;
+    }
+
+    .dataset-item:hover .dataset-delete { opacity: 1; }
+    .dataset-delete:hover { background: rgba(247,95,95,.15); }
+
+    .no-datasets {
+      padding: 24px 16px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    /* ── Main content ── */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Toolbar ── */
+    .toolbar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .toolbar-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-right: 4px;
+    }
+
+    .badge {
+      font-size: 10px;
+      padding: 2px 7px;
+      border-radius: 10px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+
+    .spacer { flex: 1; }
+
+    .search-box {
+      display: flex;
+      align-items: center;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0 10px;
+      gap: 6px;
+      height: 32px;
+    }
+
+    .search-box input {
+      background: none;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-size: 13px;
+      width: 160px;
+    }
+
+    .search-box input::placeholder { color: var(--muted); }
+
+    select {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-size: 12px;
+      padding: 0 8px;
+      height: 32px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .btn {
+      height: 32px;
+      padding: 0 14px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background .15s, border-color .15s;
+      white-space: nowrap;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .btn-primary:hover { background: #3a7ae0; border-color: #3a7ae0; }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text);
+    }
+
+    .btn-ghost:hover { background: var(--surface2); }
+
+    .btn-danger { color: var(--danger); }
+    .btn-danger:hover { background: rgba(247,95,95,.1); border-color: var(--danger); }
+
+    /* ── Schema panel ── */
+    .schema-bar {
+      background: rgba(79,142,247,.06);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 20px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: nowrap;
+      align-items: center;
+      overflow-x: auto;
+      /* hide scrollbar visually but keep it functional */
+      scrollbar-width: none;
+    }
+    .schema-bar::-webkit-scrollbar { display: none; }
+
+    .schema-label {
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-right: 4px;
+    }
+
+    .col-chip {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .col-type {
+      color: var(--accent2);
+      font-size: 9px;
+      font-family: var(--mono);
+    }
+
+    /* ── Table ── */
+    .table-wrap {
+      flex: 1;
+      overflow: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    thead {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    th {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    th:hover { color: var(--text); }
+
+    th.sorted { color: var(--accent); }
+
+    td {
+      padding: 9px 14px;
+      border-bottom: 1px solid rgba(42,48,73,.5);
+      max-width: 280px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+
+    tr:hover td { background: var(--surface2); }
+
+    td.null-val { color: var(--muted); font-style: italic; font-family: var(--sans); }
+
+    td._row_id { color: var(--muted); font-size: 11px; }
+
+    .row-actions { display: flex; gap: 6px; opacity: 0; transition: opacity .15s; }
+    tr:hover .row-actions { opacity: 1; }
+
+    .row-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 11px;
+      padding: 2px 7px;
+      transition: all .15s;
+    }
+
+    .row-btn:hover { color: var(--text); border-color: var(--text); }
+    .row-btn.del:hover { color: var(--danger); border-color: var(--danger); }
+
+    /* ── Pagination ── */
+    .pagination {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .pag-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      cursor: pointer;
+      font-size: 12px;
+      padding: 4px 10px;
+      transition: background .15s;
+    }
+
+    .pag-btn:disabled { opacity: .35; cursor: default; }
+    .pag-btn:not(:disabled):hover { background: var(--border); }
+
+    /* ── Empty / Loading states ── */
+    .center-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 14px;
+      text-align: center;
+      padding: 40px;
+    }
+
+    .center-state .big-icon { font-size: 48px; opacity: .4; }
+    .center-state p { max-width: 320px; line-height: 1.6; font-size: 13px; }
+
+    .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.65);
+      backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1000;
+      opacity: 0; pointer-events: none;
+      transition: opacity .2s;
+    }
+
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      width: 480px;
+      max-width: 95vw;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: var(--shadow);
+      transform: translateY(12px);
+      transition: transform .2s;
+    }
+
+    .modal-overlay.open .modal { transform: translateY(0); }
+
+    .modal-header {
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-title { font-size: 15px; font-weight: 600; }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 18px;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .modal-close:hover { color: var(--text); background: var(--surface2); }
+
+    .modal-body { padding: 18px 20px; overflow-y: auto; flex: 1; }
+
+    .modal-footer {
+      padding: 14px 20px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .form-group { margin-bottom: 14px; }
+
+    .form-label {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 6px;
+      display: block;
+    }
+
+    .form-input {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-size: 13px;
+      font-family: var(--mono);
+      padding: 8px 10px;
+      outline: none;
+      transition: border-color .15s;
+    }
+
+    .form-input:focus { border-color: var(--accent); }
+
+    /* ── SQL panel ── */
+    .sql-panel {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+    }
+
+    .sql-toggle {
+      padding: 10px 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      user-select: none;
+      border-top: 1px solid var(--border);
+      transition: background .15s;
+    }
+
+    .sql-toggle:hover { color: var(--text); background: var(--surface2); }
+
+    .sql-body {
+      padding: 0 20px 16px;
+      display: none;
+    }
+
+    .sql-body.open { display: block; }
+
+    /* Auto-grow textarea wrapper */
+    .sql-editor-wrap {
+      position: relative;
+      flex: 1;
+    }
+
+    /* The invisible mirror div that drives height */
+    .sql-editor-mirror {
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.6;
+      padding: 10px 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      visibility: hidden;
+      pointer-events: none;
+      min-height: 72px;
+      border: 1px solid transparent;
+      border-radius: var(--radius);
+    }
+
+    textarea.sql-editor {
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.6;
+      resize: none;           /* no manual resize handle */
+      overflow: hidden;       /* no scrollbar — grows instead */
+      min-height: 72px;
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      padding: 10px 12px;
+      outline: none;
+      transition: border-color .15s, box-shadow .15s;
+      /* Position on top of the mirror */
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 100%;
+    }
+
+    textarea.sql-editor:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(79,142,247,.12);
+    }
+
+    textarea.form-input {
+      font-family: var(--mono);
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    /* ── Custom scrollbars (global) ── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+    * { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+
+    /* ── Toast ── */
+    #toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 9999;
+    }
+
+    .toast {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 16px;
+      font-size: 13px;
+      box-shadow: var(--shadow);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      max-width: 320px;
+      animation: slideIn .25s ease;
+    }
+
+    @keyframes slideIn {
+      from { transform: translateX(40px); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+
+    .toast.success .toast-icon { color: var(--accent2); }
+    .toast.error .toast-icon { color: var(--danger); }
+    .toast.info .toast-icon { color: var(--accent); }
+
+    /* ── Upload progress ── */
+    .upload-progress {
+      padding: 10px 16px;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .progress-bar-wrap {
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      margin-top: 6px;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 2px;
+      width: 0;
+      transition: width .3s;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">⬡</div>
+    BYOD <span class="logo-sub">— Bring Your Own Data</span>
+  </div>
+  <div class="spacer"></div>
+  <div class="status-dot" id="status-dot"></div>
+  <span class="status-label" id="status-label">connecting…</span>
+</header>
+
+<div class="app">
+  <!-- Sidebar -->
+  <aside>
+    <div class="sidebar-section">
+      <div class="sidebar-title">Upload Data</div>
+      <div id="drop-zone">
+        <input type="file" id="file-input" multiple accept=".csv,.xlsx,.xls" />
+        <div class="drop-icon">⬆</div>
+        <div class="drop-label">Drop files or click to browse</div>
+        <div class="drop-types">CSV · XLSX · XLS</div>
+      </div>
+      <div id="upload-progress" class="upload-progress" style="display:none">
+        <span id="upload-status">Uploading…</span>
+        <div class="progress-bar-wrap"><div class="progress-bar" id="progress-bar"></div></div>
+      </div>
+    </div>
+    <div class="sidebar-section" style="flex:1;overflow:hidden;display:flex;flex-direction:column;padding-bottom:0">
+      <div class="sidebar-title">Datasets</div>
+      <div class="dataset-list" id="dataset-list">
+        <div class="no-datasets">No datasets yet.<br>Upload a CSV to get started.</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main + persistent SQL panel -->
+  <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+    <main id="main" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+      <div class="center-state" id="welcome">
+        <div class="big-icon">📂</div>
+        <strong>No dataset selected</strong>
+        <p>Upload a CSV or XLSX file and select a dataset from the sidebar to start exploring and editing your data.</p>
+      </div>
+    </main>
+
+    <!-- Persistent SQL panel - survives dataset switching -->
+    <div class="sql-panel" id="sql-panel">
+      <div class="sql-toggle" onclick="toggleSql()">
+        <span>⌨ SQL Query</span>
+        <span style="font-size:10px;color:var(--muted);margin-left:8px" id="sql-result-badge"></span>
+        <div class="spacer"></div>
+        <span id="sql-arrow">▾</span>
+      </div>
+      <div class="sql-body" id="sql-body">
+        <div style="display:flex;gap:8px;align-items:flex-start;">
+          <div class="sql-editor-wrap">
+            <!-- Mirror div drives the height; textarea sits on top -->
+            <div class="sql-editor-mirror" id="sql-mirror" aria-hidden="true">​</div>
+            <textarea class="sql-editor" id="sql-input"
+              placeholder="SELECT * FROM my_dataset LIMIT 10"
+              onkeydown="handleSqlKey(event)"
+              oninput="growSqlEditor(this)"
+              spellcheck="false"
+              autocomplete="off"
+              autocorrect="off"
+              autocapitalize="off"></textarea>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;padding-top:1px;">
+            <button class="btn btn-primary" onclick="runSql()" style="white-space:nowrap">▶ Run</button>
+            <button class="btn btn-ghost" onclick="clearSql()" style="white-space:nowrap;font-size:11px">✕ Clear</button>
+          </div>
+        </div>
+        <div style="font-size:10px;color:var(--muted);margin-top:6px;">Ctrl+Enter to run · SELECT only · queries all datasets</div>
+        <div id="sql-result" style="margin-top:10px"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-title">Edit Row</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="modal-confirm">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toasts -->
+<div id="toast-container"></div>
+
+<script>
+const API = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ? 'http://localhost:8000'
+  : '';  // same origin if served together
+
+let currentDataset = null;
+let currentSchema = [];
+let currentPage = 1;
+let currentPageSize = 50;
+let currentTotal = 0;
+let filterCol = '';
+let filterVal = '';
+let sortCol = '';
+let sortDir = 'asc';
+let datasets = [];
+
+// ── Health check ──────────────────────────────────────────────────────────────
+async function checkHealth() {
+  try {
+    const r = await fetch(`${API}/health`);
+    const ok = r.ok;
+    document.getElementById('status-dot').style.background = ok ? 'var(--accent2)' : 'var(--danger)';
+    document.getElementById('status-label').textContent = ok ? 'connected' : 'offline';
+  } catch {
+    document.getElementById('status-dot').style.background = 'var(--danger)';
+    document.getElementById('status-label').textContent = 'offline';
+  }
+}
+
+// ── Upload ────────────────────────────────────────────────────────────────────
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  uploadFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener('change', () => uploadFiles(fileInput.files));
+
+async function uploadFiles(files) {
+  if (!files.length) return;
+  const prog = document.getElementById('upload-progress');
+  const bar = document.getElementById('progress-bar');
+  const status = document.getElementById('upload-status');
+  prog.style.display = 'block';
+  bar.style.width = '30%';
+  status.textContent = `Uploading ${files.length} file(s)…`;
+
+  const fd = new FormData();
+  for (const f of files) fd.append('files', f);
+
+  try {
+    bar.style.width = '60%';
+    const r = await fetch(`${API}/datasets/upload`, { method: 'POST', body: fd });
+    bar.style.width = '90%';
+    const data = await r.json();
+    bar.style.width = '100%';
+
+    let ok = 0, fail = 0;
+    for (const u of data.uploads) {
+      if (u.status === 'ok') { ok++; toast('success', `✓ ${u.file} → ${u.dataset} (${u.rows} rows)`); }
+      else { fail++; toast('error', `✗ ${u.file}: ${u.detail}`); }
+    }
+
+    await loadDatasets();
+    if (ok > 0) {
+      const lastName = data.uploads.filter(u => u.status === 'ok').pop()?.dataset;
+      if (lastName) selectDataset(lastName);
+    }
+  } catch (e) {
+    toast('error', 'Upload failed: ' + e.message);
+  } finally {
+    setTimeout(() => { prog.style.display = 'none'; bar.style.width = '0'; }, 800);
+    fileInput.value = '';
+  }
+}
+
+// ── Dataset list ──────────────────────────────────────────────────────────────
+async function loadDatasets() {
+  try {
+    const r = await fetch(`${API}/datasets`);
+    const data = await r.json();
+    datasets = data.datasets;
+    renderDatasetList();
+  } catch (e) {
+    toast('error', 'Failed to load datasets');
+  }
+}
+
+function renderDatasetList() {
+  const el = document.getElementById('dataset-list');
+  if (!datasets.length) {
+    el.innerHTML = '<div class="no-datasets">No datasets yet.<br>Upload a CSV to get started.</div>';
+    return;
+  }
+  el.innerHTML = datasets.map(d => `
+    <div class="dataset-item ${d.name === currentDataset ? 'active' : ''}" onclick="selectDataset('${d.name}')">
+      <span class="dataset-icon">🗃</span>
+      <span class="dataset-name" title="${d.name}">${d.name}</span>
+      ${d.row_count != null ? `<span class="dataset-count">${fmtNum(d.row_count)}</span>` : ''}
+      <button class="dataset-delete" onclick="event.stopPropagation();deleteDataset('${d.name}')" title="Drop dataset">✕</button>
+    </div>
+  `).join('');
+}
+
+async function deleteDataset(name) {
+  if (!confirm(`Drop dataset "${name}"? This cannot be undone.`)) return;
+  await fetch(`${API}/datasets/${name}`, { method: 'DELETE' });
+  toast('info', `Dataset "${name}" dropped`);
+  if (currentDataset === name) {
+    currentDataset = null;
+    showWelcome();
+  }
+  await loadDatasets();
+}
+
+// ── Select dataset ────────────────────────────────────────────────────────────
+async function selectDataset(name) {
+  currentDataset = name;
+  currentPage = 1;
+  filterCol = ''; filterVal = '';
+  sortCol = ''; sortDir = 'asc';
+  renderDatasetList();
+
+  // Load schema
+  try {
+    const r = await fetch(`${API}/datasets/${name}/schema`);
+    const data = await r.json();
+    currentSchema = data.columns;
+  } catch { currentSchema = []; }
+
+  renderMain();
+}
+
+// ── Main render ───────────────────────────────────────────────────────────────
+function showWelcome() {
+  const main = document.getElementById('main');
+  main.innerHTML = `
+    <div class="center-state" id="welcome">
+      <div class="big-icon">📂</div>
+      <strong>No dataset selected</strong>
+      <p>Upload a CSV or XLSX file and select a dataset from the sidebar to start exploring and editing your data.</p>
+    </div>`;
+}
+
+function renderMain() {
+  const main = document.getElementById('main');
+  const filterCols = currentSchema.filter(c => c.name !== '_row_id');
+  const sortCols = currentSchema.filter(c => c.name !== '_row_id');
+
+  main.innerHTML = `
+    <div class="toolbar">
+      <span class="toolbar-title">${currentDataset}</span>
+      <span class="badge" id="row-badge">…</span>
+
+      <div class="search-box">
+        <span style="color:var(--muted);font-size:13px">⌕</span>
+        <select id="filter-col" onchange="filterCol=this.value;currentPage=1;loadRows()" style="background:none;border:none;color:var(--muted);font-size:12px;padding:0;height:auto">
+          <option value="">column…</option>
+          ${filterCols.map(c => `<option value="${c.name}">${c.name}</option>`).join('')}
+        </select>
+        <input id="filter-val" type="text" placeholder="filter value…"
+          style="width:130px"
+          oninput="filterVal=this.value;currentPage=1;debounceLoad()" />
+      </div>
+
+      <span style="font-size:11px;color:var(--muted)">Sort:</span>
+      <select onchange="sortCol=this.value;currentPage=1;loadRows()">
+        <option value="">—</option>
+        ${sortCols.map(c => `<option value="${c.name}">${c.name}</option>`).join('')}
+      </select>
+      <select onchange="sortDir=this.value;currentPage=1;loadRows()">
+        <option value="asc">↑ asc</option>
+        <option value="desc">↓ desc</option>
+      </select>
+
+      <div class="spacer"></div>
+      <button class="btn btn-ghost" onclick="exportCsv()" title="Download dataset as CSV">⬇ Export CSV</button>
+      <button class="btn btn-primary" onclick="openInsertModal()">+ Add Row</button>
+    </div>
+
+    <div class="schema-bar" id="schema-bar"></div>
+
+    <div class="table-wrap" id="table-wrap">
+      <div class="center-state"><div class="spinner"></div></div>
+    </div>
+
+    <div class="pagination" id="pagination"></div>
+  `;
+
+  renderSchema();
+  loadRows();
+}
+
+function renderSchema() {
+  const el = document.getElementById('schema-bar');
+  if (!el) return;
+  el.innerHTML = `<span class="schema-label">Schema</span>` +
+    currentSchema.map(c => `
+      <span class="col-chip">
+        ${c.name}
+        <span class="col-type">${c.type}</span>
+      </span>`).join('');
+}
+
+// ── Rows ──────────────────────────────────────────────────────────────────────
+let loadTimer;
+function debounceLoad() { clearTimeout(loadTimer); loadTimer = setTimeout(loadRows, 300); }
+
+async function loadRows() {
+  if (!currentDataset) return;
+  const wrap = document.getElementById('table-wrap');
+  if (!wrap) return;
+
+  let url = `${API}/datasets/${currentDataset}/rows?page=${currentPage}&page_size=${currentPageSize}`;
+  if (filterCol && filterVal) url += `&filter_col=${encodeURIComponent(filterCol)}&filter_val=${encodeURIComponent(filterVal)}`;
+  if (sortCol) url += `&sort_col=${encodeURIComponent(sortCol)}&sort_dir=${sortDir}`;
+
+  try {
+    const r = await fetch(url);
+    const data = await r.json();
+    currentTotal = data.total;
+    renderTable(data);
+    renderPagination(data);
+    const badge = document.getElementById('row-badge');
+    if (badge) badge.textContent = `${fmtNum(data.total)} rows`;
+  } catch (e) {
+    wrap.innerHTML = `<div class="center-state"><p style="color:var(--danger)">Failed to load rows: ${e.message}</p></div>`;
+  }
+}
+
+function renderTable(data) {
+  const wrap = document.getElementById('table-wrap');
+  if (!wrap) return;
+
+  if (!data.rows.length) {
+    wrap.innerHTML = `<div class="center-state"><div class="big-icon">🔍</div><p>No rows found.</p></div>`;
+    return;
+  }
+
+  const cols = Object.keys(data.rows[0]);
+
+  wrap.innerHTML = `<table>
+    <thead><tr>
+      ${cols.map(c => `<th class="${c===sortCol?'sorted':''}" onclick="setSort('${c}')">${c}${c===sortCol?(sortDir==='asc'?' ↑':' ↓'):''}</th>`).join('')}
+      <th style="width:100px">Actions</th>
+    </tr></thead>
+    <tbody>
+      ${data.rows.map(row => `
+        <tr>
+          ${cols.map(c => {
+            const v = row[c];
+            if (v === null || v === undefined) return `<td class="null-val">null</td>`;
+            return `<td class="${c==='_row_id'?'_row_id':''}" title="${String(v).replace(/"/g,'&quot;')}">${escape(String(v))}</td>`;
+          }).join('')}
+          <td>
+            <div class="row-actions">
+              <button class="row-btn" onclick='openEditModal(${JSON.stringify(row)})'>Edit</button>
+              <button class="row-btn del" onclick="deleteRow(${row._row_id})">Del</button>
+            </div>
+          </td>
+        </tr>`).join('')}
+    </tbody>
+  </table>`;
+}
+
+function escape(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function setSort(col) {
+  if (sortCol === col) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+  else { sortCol = col; sortDir = 'asc'; }
+  currentPage = 1;
+  loadRows();
+}
+
+function renderPagination(data) {
+  const el = document.getElementById('pagination');
+  if (!el) return;
+  const start = (data.page - 1) * data.page_size + 1;
+  const end = Math.min(data.page * data.page_size, data.total);
+  el.innerHTML = `
+    <span>${data.total ? `${fmtNum(start)}–${fmtNum(end)} of ${fmtNum(data.total)}` : '0 rows'}</span>
+    <div class="spacer"></div>
+    <span>Rows per page:</span>
+    <select onchange="currentPageSize=+this.value;currentPage=1;loadRows()">
+      ${[25,50,100,250].map(n => `<option ${n===currentPageSize?'selected':''}>${n}</option>`).join('')}
+    </select>
+    <button class="pag-btn" onclick="currentPage=1;loadRows()" ${data.page<=1?'disabled':''}>«</button>
+    <button class="pag-btn" onclick="currentPage--;loadRows()" ${data.page<=1?'disabled':''}>‹</button>
+    <span>Page ${data.page} of ${data.pages}</span>
+    <button class="pag-btn" onclick="currentPage++;loadRows()" ${data.page>=data.pages?'disabled':''}>›</button>
+    <button class="pag-btn" onclick="currentPage=${data.pages};loadRows()" ${data.page>=data.pages?'disabled':''}>»</button>
+  `;
+}
+
+// ── CRUD ──────────────────────────────────────────────────────────────────────
+function openInsertModal() {
+  const cols = currentSchema.filter(c => c.name !== '_row_id');
+  document.getElementById('modal-title').textContent = `Add row to "${currentDataset}"`;
+  document.getElementById('modal-body').innerHTML = cols.map(c => `
+    <div class="form-group">
+      <label class="form-label">${c.name} <span style="color:var(--accent2)">${c.type}</span></label>
+      <input class="form-input" id="field_${c.name}" type="text" placeholder="${c.type}" />
+    </div>`).join('');
+  document.getElementById('modal-confirm').onclick = async () => {
+    const data = {};
+    for (const c of cols) data[c.name] = document.getElementById('field_'+c.name).value || null;
+    const r = await fetch(`${API}/datasets/${currentDataset}/rows`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({data})
+    });
+    if (r.ok) { toast('success', 'Row inserted'); closeModal(); await loadRows(); }
+    else { const e = await r.json(); toast('error', e.detail || 'Insert failed'); }
+  };
+  openModal();
+}
+
+function openEditModal(row) {
+  const cols = currentSchema.filter(c => c.name !== '_row_id');
+  document.getElementById('modal-title').textContent = `Edit row #${row._row_id}`;
+  document.getElementById('modal-body').innerHTML = cols.map(c => `
+    <div class="form-group">
+      <label class="form-label">${c.name} <span style="color:var(--accent2)">${c.type}</span></label>
+      <input class="form-input" id="field_${c.name}" type="text" value="${row[c.name] ?? ''}" />
+    </div>`).join('');
+  document.getElementById('modal-confirm').onclick = async () => {
+    const data = {};
+    for (const c of cols) data[c.name] = document.getElementById('field_'+c.name).value || null;
+    const r = await fetch(`${API}/datasets/${currentDataset}/rows/${row._row_id}`, {
+      method: 'PUT', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({data})
+    });
+    if (r.ok) { toast('success', 'Row updated'); closeModal(); await loadRows(); }
+    else { const e = await r.json(); toast('error', e.detail || 'Update failed'); }
+  };
+  openModal();
+}
+
+async function deleteRow(rowId) {
+  if (!confirm(`Delete row #${rowId}?`)) return;
+  const r = await fetch(`${API}/datasets/${currentDataset}/rows/${rowId}`, { method: 'DELETE' });
+  if (r.ok) { toast('success', `Row #${rowId} deleted`); await loadRows(); }
+  else { const e = await r.json(); toast('error', e.detail || 'Delete failed'); }
+}
+
+// ── SQL ───────────────────────────────────────────────────────────────────────
+function toggleSql() {
+  const body = document.getElementById('sql-body');
+  const arrow = document.getElementById('sql-arrow');
+  body.classList.toggle('open');
+  arrow.textContent = body.classList.contains('open') ? '▴' : '▾';
+}
+
+function handleSqlKey(e) {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    runSql();
+  }
+}
+
+function growSqlEditor(ta) {
+  const mirror = document.getElementById('sql-mirror');
+  if (!mirror) return;
+  // Sync mirror text, append a zero-width space to keep trailing newline height
+  mirror.textContent = ta.value + '\u200b';
+}
+
+function clearSql() {
+  const ta = document.getElementById('sql-input');
+  ta.value = '';
+  growSqlEditor(ta);
+  document.getElementById('sql-result').innerHTML = '';
+  document.getElementById('sql-result-badge').textContent = '';
+}
+
+async function runSql() {
+  const sql = document.getElementById('sql-input').value.trim();
+  if (!sql) return;
+  const res = document.getElementById('sql-result');
+  const badge = document.getElementById('sql-result-badge');
+  res.innerHTML = '<div style="color:var(--muted);font-size:12px">Running…</div>';
+  badge.textContent = '';
+  try {
+    const r = await fetch(`${API}/query`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({sql})
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      res.innerHTML = `<div style="color:var(--danger);font-size:12px">${data.detail}</div>`;
+      badge.textContent = '✗ error';
+      badge.style.color = 'var(--danger)';
+      return;
+    }
+    badge.textContent = `${fmtNum(data.count)} row(s)`;
+    badge.style.color = 'var(--accent2)';
+    if (!data.rows.length) {
+      res.innerHTML = '<div style="color:var(--muted);font-size:12px">No rows returned.</div>';
+      return;
+    }
+    res.innerHTML = `
+      <div style="overflow:auto;max-height:240px;border:1px solid var(--border);border-radius:var(--radius);">
+        <table style="font-size:11px">
+          <thead><tr>${data.columns.map(c=>`<th>${c}</th>`).join('')}<th></th></tr></thead>
+          <tbody>${data.rows.map(row=>`<tr>${data.columns.map(c=>`<td>${row[c]??'<span class="null-val">null</span>'}</td>`).join('')}<td></td></tr>`).join('')}</tbody>
+        </table>
+      </div>`;
+  } catch(e) {
+    res.innerHTML = `<div style="color:var(--danger);font-size:12px">${e.message}</div>`;
+    badge.textContent = '✗ error';
+    badge.style.color = 'var(--danger)';
+  }
+}
+
+// ── Modal helpers ─────────────────────────────────────────────────────────────
+function openModal() { document.getElementById('modal-overlay').classList.add('open'); }
+function closeModal() { document.getElementById('modal-overlay').classList.remove('open'); }
+document.getElementById('modal-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal-overlay')) closeModal();
+});
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function toast(type, msg) {
+  const icons = { success: '✓', error: '✗', info: 'ℹ' };
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span class="toast-icon">${icons[type]||'•'}</span><span>${msg}</span>`;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+// ── Export ────────────────────────────────────────────────────────────────────
+function exportCsv() {
+  if (!currentDataset) return;
+  const url = `${API}/datasets/${currentDataset}/export`;
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${currentDataset}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  toast('info', `Downloading ${currentDataset}.csv…`);
+}
+
+function fmtNum(n) { return n?.toLocaleString() ?? 0; }
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+checkHealth();
+setInterval(checkHealth, 15000);
+loadDatasets();
+</script>
+</body>
+</html>
