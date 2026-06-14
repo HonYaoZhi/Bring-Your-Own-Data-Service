@@ -415,7 +415,7 @@ Because `.csv/.xlsx` files are not self-describing and come in countless messy v
 - **Pandas pre-inference:** Use pandas to detect types first, then pass to DuckDB. Rejected because pandas loads the entire file into memory, which defeats the chunked upload approach.
 - **Schema review after upload:** Instead of relying entirely on automatic type inference, the system can first import all columns as text and return the detected schema to the frontend. Users may then review and adjust column types before the final table is created using `TRY_CAST`. This approach provides better control over ambiguous columns, such as dates and timestamps, but introduces an additional upload-and-review step compared to the current zero-configuration workflow.
 
-![Schema review after upload](https://https://github.com/HonYaoZhi/Bring-Your-Own-Data-Service/raw/main/images/schema-review-after-upload.png)
+![Schema review after upload](https://github.com/HonYaoZhi/Bring-Your-Own-Data-Service/raw/main/images/schema-review-after-upload.png)
 
 ## Temp table → permanent table
  
