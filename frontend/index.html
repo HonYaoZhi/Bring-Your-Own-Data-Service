@@ -888,13 +888,20 @@ function renderDatasetList() {
     return;
   }
   el.innerHTML = datasets.map(d => `
-    <div class="dataset-item ${d.name === currentDataset ? 'active' : ''}" onclick="selectDataset('${d.name}')">
+    <div class="dataset-item ${d.name === currentDataset ? 'active' : ''}" data-name="${escape(d.name)}">
       <span class="dataset-icon">🗃</span>
-      <span class="dataset-name" title="${d.name}">${d.name}</span>
+      <span class="dataset-name" title="${escape(d.name)}">${escape(d.name)}</span>
       ${d.row_count != null ? `<span class="dataset-count">${fmtNum(d.row_count)}</span>` : ''}
-      <button class="dataset-delete" onclick="event.stopPropagation();deleteDataset('${d.name}')" title="Drop dataset">✕</button>
+      <button class="dataset-delete" data-delete="${escape(d.name)}" title="Drop dataset">✕</button>
     </div>
   `).join('');
+  // Attach events via DOM (no inline JS with user-controlled strings)
+  el.querySelectorAll('.dataset-item').forEach(item => {
+    item.addEventListener('click', () => selectDataset(item.dataset.name));
+  });
+  el.querySelectorAll('.dataset-delete').forEach(btn => {
+    btn.addEventListener('click', e => { e.stopPropagation(); deleteDataset(btn.dataset.delete); });
+  });
 }
 
 async function deleteDataset(name) {
@@ -969,7 +976,6 @@ function renderMain() {
       </select>
 
       <div class="spacer"></div>
-      <button class="btn btn-ghost" onclick="exportCsv()" title="Download dataset as CSV">⬇ Export CSV</button>
       <button class="btn btn-primary" onclick="openInsertModal()">+ Add Row</button>
     </div>
 
@@ -1059,7 +1065,12 @@ function renderTable(data) {
 }
 
 function escape(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
 function setSort(col) {
@@ -1114,11 +1125,17 @@ function openInsertModal() {
 function openEditModal(row) {
   const cols = currentSchema.filter(c => c.name !== '_row_id');
   document.getElementById('modal-title').textContent = `Edit row #${row._row_id}`;
+  // Build markup without embedding values in HTML attributes; set .value in JS
   document.getElementById('modal-body').innerHTML = cols.map(c => `
     <div class="form-group">
-      <label class="form-label">${c.name} <span style="color:var(--accent2)">${c.type}</span></label>
-      <input class="form-input" id="field_${c.name}" type="text" value="${row[c.name] ?? ''}" />
+      <label class="form-label">${escape(c.name)} <span style="color:var(--accent2)">${escape(c.type)}</span></label>
+      <input class="form-input" id="field_${escape(c.name)}" type="text" />
     </div>`).join('');
+  // Now safely assign values using the DOM property (no HTML injection risk)
+  for (const c of cols) {
+    const el = document.getElementById('field_' + c.name);
+    if (el) el.value = row[c.name] ?? '';
+  }
   document.getElementById('modal-confirm').onclick = async () => {
     const data = {};
     for (const c of cols) data[c.name] = document.getElementById('field_'+c.name).value || null;
@@ -1183,7 +1200,7 @@ async function runSql() {
     });
     const data = await r.json();
     if (!r.ok) {
-      res.innerHTML = `<div style="color:var(--danger);font-size:12px">${data.detail}</div>`;
+      res.innerHTML = `<div style="color:var(--danger);font-size:12px">${escape(String(data.detail || 'Query error'))}</div>`;
       badge.textContent = '✗ error';
       badge.style.color = 'var(--danger)';
       return;
@@ -1198,11 +1215,15 @@ async function runSql() {
       <div style="overflow:auto;max-height:240px;border:1px solid var(--border);border-radius:var(--radius);">
         <table style="font-size:11px">
           <thead><tr>${data.columns.map(c=>`<th>${c}</th>`).join('')}<th></th></tr></thead>
-          <tbody>${data.rows.map(row=>`<tr>${data.columns.map(c=>`<td>${row[c]??'<span class="null-val">null</span>'}</td>`).join('')}<td></td></tr>`).join('')}</tbody>
+          <tbody>${data.rows.map(row=>`<tr>${data.columns.map(c=>{
+              const v = row[c];
+              if (v === null || v === undefined) return '<td class="null-val">null</td>';
+              return '<td>' + escape(String(v)) + '</td>';
+            }).join('')}<td></td></tr>`).join('')}</tbody>
         </table>
       </div>`;
   } catch(e) {
-    res.innerHTML = `<div style="color:var(--danger);font-size:12px">${e.message}</div>`;
+    res.innerHTML = `<div style="color:var(--danger);font-size:12px">${escape(String(e.message))}</div>`;
     badge.textContent = '✗ error';
     badge.style.color = 'var(--danger)';
   }
@@ -1223,19 +1244,6 @@ function toast(type, msg) {
   el.innerHTML = `<span class="toast-icon">${icons[type]||'•'}</span><span>${msg}</span>`;
   document.getElementById('toast-container').appendChild(el);
   setTimeout(() => el.remove(), 4000);
-}
-
-// ── Export ────────────────────────────────────────────────────────────────────
-function exportCsv() {
-  if (!currentDataset) return;
-  const url = `${API}/datasets/${currentDataset}/export`;
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${currentDataset}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  toast('info', `Downloading ${currentDataset}.csv…`);
 }
 
 function fmtNum(n) { return n?.toLocaleString() ?? 0; }
