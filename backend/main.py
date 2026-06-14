@@ -150,7 +150,7 @@ async def upload_files(request: Request, files: List[UploadFile] = File(...)):
             if ext == "xlsx":
                 conn.execute(
                     f'CREATE OR REPLACE TEMPORARY TABLE "{temp_table}" AS '
-                    f"SELECT * FROM read_xlsx('{temp_filepath}')"
+                    f"SELECT * FROM read_xlsx('{temp_filepath}', all_varchar = true)"
                 )
             else:
                 conn.execute(

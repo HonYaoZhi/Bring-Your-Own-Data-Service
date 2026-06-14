@@ -413,7 +413,7 @@ Because `.csv/.xlsx` files are not self-describing and come in countless messy v
 **Known limitation:** Even full-scan inference can get date and timestamp columns wrong. Ambiguous formats like `"2024-01"` or mixed date formats in the same column may end up stored as `VARCHAR`. Two fixes were considered:
  
 - **Pandas pre-inference:** Use pandas to detect types first, then pass to DuckDB. Rejected because pandas loads the entire file into memory, which defeats the chunked upload approach.
-- **Schema review after upload:** Instead of relying entirely on automatic type inference, the system can first import all columns as text and return the detected schema to the frontend. Users may then review and adjust column types before the final table is created using `TRY_CAST`. This approach provides better control over ambiguous columns, such as dates and timestamps, but introduces an additional upload-and-review step compared to the current zero-configuration workflow.
+- **Schema review after upload:** Instead of relying entirely on automatic type inference, the system can first import all columns as text by passing `all_varchar = true` and return the detected schema to the frontend. Users may then review and adjust column types before the final table is created using `TRY_CAST`. This approach provides better control over ambiguous columns, such as dates and timestamps, but introduces an additional upload-and-review step compared to the current zero-configuration workflow.
 
 ![Schema review after upload](https://github.com/HonYaoZhi/Bring-Your-Own-Data-Service/raw/main/images/schema-review-after-upload.png)
 
